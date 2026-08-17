@@ -1,0 +1,21 @@
+# Build artifacts
+target/
+*.class
+*.jar
+!demo-app/pom.xml
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Jenkins (nunca subir el home con credenciales)
+jenkins_home/
+
+# Secrets — este repo demo NO lleva .env (regla del proyecto)
+.env
+.env.*

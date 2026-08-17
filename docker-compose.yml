@@ -1,0 +1,67 @@
+# ============================================================
+# YadinStore — CI/CD Demo Stack (local, free tier)
+#
+# Levanta Jenkins local con Docker-in-Docker para correr el
+# Jenkinsfile de este repo. Opcional: Grafana + Prometheus
+# (metricas) y ElasticSearch + Kibana (logs) para demostrar
+# observabilidad — todos free tier / open source.
+#
+# Uso:
+#   docker compose up -d jenkins            # solo Jenkins
+#   docker compose up -d grafana elasticsearch kibana   # observabilidad
+#
+# Puertos:
+#   Jenkins        : http://localhost:8081   (8080 interno; 8090 lo usa kafka-ui)
+#   Grafana        : http://localhost:3000
+#   Kibana         : http://localhost:5601
+#   ElasticSearch  : http://localhost:9200
+# ============================================================
+
+services:
+  jenkins:
+    build: ./jenkins
+    container_name: yadinstore-jenkins
+    ports:
+      - "8081:8080"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock   # DinD: permite docker build
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: yadinstore-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: yadinstore-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: yadinstore-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+volumes:
+  jenkins_home:
+  grafana_data:
+  es_data:

@@ -1,0 +1,67 @@
+name: CI/CD Demo — Pipeline Replica (free tier)
+
+# ============================================================
+# Replica EXACTA del Jenkinsfile en GitHub Actions (free).
+# GitHub Actions es gratis en repos PUBLICOS (minutos ilimitados).
+# Este workflow NO hace deploy: solo valida compile/test/package
+# y que el Dockerfile compila — igual que el backend en Render.
+# ============================================================
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Compile → Test → Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Compile
+        run: |
+          cd demo-app
+          mvn -B compile -q
+
+      - name: Run tests
+        run: |
+          cd demo-app
+          mvn -B test -q
+
+      - name: Package (skip tests, ya corrieron)
+        run: |
+          cd demo-app
+          mvn -B package -DskipTests -q
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cicd-demo-app-jar
+          path: demo-app/target/*.jar
+          retention-days: 7
+
+  docker-build:
+    name: Docker Build Verification
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image (same as Jenkins/Render)
+        run: |
+          cd demo-app
+          docker build -t yadinstore-cicd-demo:ci .
+        # Sin push — solo validacion local del build
