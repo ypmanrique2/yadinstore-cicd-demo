@@ -33,17 +33,33 @@
         <span class="badge">Java 21</span><span class="badge">Maven</span><span class="badge">JUnit 5</span>
         <span class="badge">Jenkins</span><span class="badge">GitHub Actions</span><span class="badge">Docker</span>
         <span class="badge">Grafana</span><span class="badge">ElasticSearch</span>
+        <span class="badge" style="border-color:#22c55e;color:#86efac">Jenkins Live</span><span class="badge" style="border-color:#a78bfa;color:#c4b5fd">Observabilidad Live</span>
     </p>
 
     <div class="card">
         <h2 style="margin-top:0">Pipeline idéntico en 2 motores</h2>
-        <code>Checkout → Compile → Test → Package → Docker Build (validación)</code>
+        <code>Checkout → Compile → Test → Package → Docker Build → Compose Validate → Security Scan (Trivy)</code>
         <p style="margin-bottom:0">Compatible con el backend real en Render: <strong>sin deploy innecesario</strong>.</p>
+    </div>
+
+    <div class="card">
+        <h2 style="margin-top:0">🐳 Docker en vivo</h2>
+        <p style="margin-bottom:.4rem">Actividad de Docker de esta máquina en tiempo real: <code>docker events</code> + <code>docker ps</code> → Render (free tier), patrón BE-KD.</p>
+        <p style="margin-bottom:0"><a href="https://yadinstore-cicd-demo-live.onrender.com/docker-dashboard.html"><strong>Abrir dashboard en vivo</strong></a> · agente local: <code>.\docker-live\docker-agent.ps1</code></p>
+    </div>
+
+    <div class="card" style="border-color:#22c55e">
+        <h2 style="margin-top:0">🔧 Jenkins en vivo</h2>
+        <p style="margin-bottom:.4rem">Pipeline Jenkins + métricas en tiempo real: <code>jenkins-obs-agent.ps1</code> (docker events yadin-jenkins + Jenkins <code>:8081/api/json</code> + <code>:9090/query?outbox_pending</code>) → <code>POST /api/jenkins/live</code> ring 200, poll 2s → Render free <code>yadinstore-jenkins-obs-live</code> (clone <code>docker-live/server.js:22</code>, zero-deps).</p>
+        <p style="margin-bottom:.4rem"><a href="https://yadinstore-jenkins-obs-live.onrender.com/jenkins-dashboard.html"><strong>Abrir Jenkins dashboard en vivo</strong></a> · agente: <code>.\yadinstore-jenkins-obs-live\jenkins-obs-agent.ps1 -Token $env:DOCKER_LIVE_TOKEN</code></p>
+        <p style="margin-bottom:0;font-size:.85rem;color:#8b93a7">Local free ok (Prometheus 9090 + Grafana 3000 + Jenkins 8081 + ES 9200/Kibana 5601) → Prod Grafana Cloud+Loki roadmap §8 <a href="https://github.com/ypmanrique2/yadinStore-Spec/blob/main/avance_21-08-2026.md">avance_21-08-2026.md</a> · <code>GET /api/jenkins/live</code> público, <code>POST</code> con <code>x-live-token</code>, CORS Pages-only, rate-limit 10/min, <code>permitAll</code> agregados.</p>
     </div>
 
     <h2>Documentación</h2>
     <ul>
         <li><a href="docs/jenkins.html">Jenkins — Pipeline as Code</a></li>
+        <li><a href="docs/jenkins-live.html">Jenkins Live — Dashboard en vivo (Render free, ring 200, poll 2s)</a></li>
+        <li><a href="docs/observability-live.html">Observabilidad Live — Prometheus/Grafana local vs Grafana Cloud+Loki (Fase2)</a></li>
         <li><a href="docs/github-actions.html">GitHub Actions — CI gratis</a></li>
         <li><a href="docs/grafana.html">Grafana — Métricas</a></li>
         <li><a href="docs/elasticsearch.html">ElasticSearch + Kibana — Logs</a></li>
