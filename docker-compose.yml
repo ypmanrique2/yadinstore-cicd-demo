@@ -9,12 +9,17 @@
 # Uso:
 #   docker compose up -d jenkins            # solo Jenkins
 #   docker compose up -d grafana elasticsearch kibana   # observabilidad
+#   docker compose up -d filebeat           # shipping ECS JSON -> ES yadinstore-logs-*
 #
 # Puertos:
 #   Jenkins        : http://localhost:8081   (8080 interno; 8090 lo usa kafka-ui)
-#   Grafana        : http://localhost:3000
+#   Grafana        : http://localhost:3000  (10.4.3 pinneado — ver docs/grafana.md ChunkLoadError)
 #   Kibana         : http://localhost:5601
 #   ElasticSearch  : http://localhost:9200
+# Troubleshooting:
+#   - ES yadinstore-logs-* vacio → ver docs/elasticsearch.md § Diagnostico + filebeat.yml
+#   - Grafana ChunkLoadError → docs/grafana.md § Troubleshooting (down -v + pull 10.4.3)
+#   - Docker 500 //./pipe/dockerDesktopLinuxEngine → docs/elasticsearch.md § Docker Desktop
 # ============================================================
 
 services:
@@ -29,7 +34,9 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    # Pin 10.4.3 — ver docs/grafana.md § Troubleshooting ChunkLoadError:
+    # grafana:latest (12.x) rompe chunks React build vs cache navegador + mismatch con ci-cd-infra:10.4.3
+    image: grafana/grafana:10.4.3
     container_name: yadinstore-grafana
     ports:
       - "3000:3000"
@@ -61,7 +68,25 @@ services:
       - elasticsearch
     restart: unless-stopped
 
+  # Filebeat — shipping ECS JSON -> ES yadinstore-logs-*
+  # Opcional local: descomentar para que Filebeat harveste /var/log/yadinstore/*.log
+  # Requiere: backend loggeando JSON a ./logs/*.log mount + filebeat.yml en raiz
+  # Ver docs/elasticsearch.md § Filebeat. Sin filebeat, usar POST manual (B1) o ring 100 (B2).
+  # filebeat:
+  #   image: docker.elastic.co/beats/filebeat:8.15.3
+  #   container_name: yadinstore-filebeat
+  #   user: root
+  #   volumes:
+  #     - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+  #     - ./logs:/var/log/yadinstore:ro
+  #     - filebeat_data:/usr/share/filebeat/data
+  #   depends_on:
+  #     - elasticsearch
+  #   restart: unless-stopped
+  #   command: ["-e", "-strict.perms=false"]
+
 volumes:
   jenkins_home:
   grafana_data:
   es_data:
+  filebeat_data:

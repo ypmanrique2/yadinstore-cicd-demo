@@ -1,0 +1,33 @@
+# Filebeat minimo — shipping logs ECS JSON a Elasticsearch local
+# Uso: descomentar servicio filebeat en docker-compose.yml y:
+#   docker compose up -d filebeat
+# Requiere logs JSON ECS en /var/log/yadinstore/*.log (backend logging.structured.format.console: ecs)
+# Ver docs/elasticsearch.md § Filebeat
+
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/yadinstore/*.log
+    json.keys_under_root: true
+    json.add_error_key: true
+    json.message_key: message
+    # ECS ya trae @timestamp, level, logger, message, traceId, etc.
+
+processors:
+  - add_host_metadata: ~
+  - add_docker_metadata: ~
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "yadinstore-logs-%{+yyyy.MM.dd}"
+  # single-node local: sin auth (xpack.security.enabled=false)
+
+setup.ilm.enabled: true
+setup.ilm.rollover_alias: "yadinstore-logs"
+setup.ilm.pattern: "{now/d}-000001"
+setup.template.name: "yadinstore-logs"
+setup.template.pattern: "yadinstore-logs-*"
+
+# ILM local demo: hot 30d delete (ver docs/elasticsearch.md)
+# Para prod free tier ES descartado — usar Grafana Cloud Loki OTLP (observability-live.md)
