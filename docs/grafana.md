@@ -16,6 +16,84 @@ docker compose up -d grafana
 > se usa para métricas de la infra (mongo, kafka, backend) — Kibana/ElasticSearch quedan
 > para logs (ver [`elasticsearch.md`](./elasticsearch.md)).
 
+## Data source Prometheus — http://prometheus:9090 (local)
+
+> Grafana ya fix pin `10.4.3` y `docker compose pull` ok (ver Troubleshooting abajo), pero falta datasource.
+
+**Importante: dónde está Prometheus segun compose:**
+
+| Compose | Prometheus URL | Grafana → Prometheus |
+|---------|---------------|----------------------|
+| `yadinstore-cicd-demo/docker-compose.yml` | **NO incluye Prometheus** (solo grafana standalone) | No hay `http://prometheus:9090` resoluble. Usar host `http://host.docker.internal:9090` si levantas `ci-cd-infra` aparte, o provisionar prometheus en mismo network. |
+| `ci-cd-infra/docker-compose.yml` | `prom/prometheus:v2.52.0` `container_name: yadin-prometheus` `http://prometheus:9090` (service name `prometheus` en `yadin-net`) | Grafana en mismo `yadin-net` resuelve `http://prometheus:9090` por service name. |
+
+**Opción A — UI (rápida, verificada):**
+
+1. `http://localhost:3000` → Login (`admin` / tu password cambiado — ver § Admin password abajo).
+2. **Connections** → **Data sources** → **Add data source** → **Prometheus**.
+3. `Name: Prometheus` | `URL: http://prometheus:9090` (si usas `yadinstore-cicd-demo` sin prometheus: usar `http://host.docker.internal:9090` tras `docker compose -f ci-cd-infra/docker-compose.yml up -d prometheus`, o `http://yadin-prometheus:9090` si unes networks).
+4. **Save & test** → debe dar `Successfully queried the Prometheus API` (green). Si `Bad Gateway`: prometheus no está up — `docker ps | grep prometheus` y `curl http://localhost:9090/-/healthy`.
+5. Si Grafana y Prometheus están en composes separados y `http://prometheus:9090` da `Unknown host`: crear network compartida:
+   ```bash
+   docker network create yadin-net  # si no existe (ci-cd-infra ya la crea)
+   docker network connect yadin-net yadinstore-grafana
+   # o añadir en yadinstore-cicd-demo/docker-compose.yml: networks: [yadin-net] + networks: yadin-net: external: true
+   ```
+
+**Opción B — Provisioning as code (recomendado):**
+
+```yaml
+# yadinstore-cicd-demo/grafana/provisioning/datasources/prometheus.yml
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+```
+Montar en compose: `volumes: ["./grafana/provisioning:/etc/grafana/provisioning"]` + `GF_PATHS_PROVISIONING=/etc/grafana/provisioning`.
+
+**Alternativa sin Prometheus:** usar backend metrics directo `http://host.docker.internal:8080/actuator/prometheus` como datasource Prometheus (el backend expone `/actuator/prometheus` si `micrometer-registry-prometheus` está activo), pero se recomienda Prometheus real para RED.
+
+## Dashboard import — observability-live.json (RED)
+
+**Fuente:** `ci-cd-infra/monitoring/grafana/dashboards/observability-live.json` (uid `yadinstore-observability-live`, title `YadinStore - Observability Live RED`, Grafana 10.4.3, requiere Prometheus datasource).
+
+**Import UI:**
+
+1. Grafana → **Dashboards** → **Import** → **Upload JSON file** → seleccionar `observability-live.json`.
+2. En **Options** → **Prometheus** → elegir datasource `Prometheus` (el creado arriba).
+3. **Import** → dashboard aparece con panels RED: `Rate (req/s)`, `Errors (5xx)`, `Duration p95`, `outbox.pending gauge`, `http.server.requests` histogram.
+
+**Provisioning dashboards:**
+
+```yaml
+# grafana/provisioning/dashboards/observability.yml
+apiVersion: 1
+providers:
+  - name: yadinstore
+    orgId: 1
+    folder: YadinStore
+    type: file
+    options:
+      path: /etc/grafana/dashboards
+```
+Mount: `volumes: ["../ci-cd-infra/monitoring/grafana/dashboards:/etc/grafana/dashboards:ro"]`
+
+## Admin password — cómo configurar tras cambio
+
+User reporta: cambió admin password en Grafana y pregunta cómo configurarlo persistente.
+
+| Via | Cómo | Cuándo |
+|-----|------|--------|
+| **Env var (recomendado)** | `yadinstore-cicd-demo/docker-compose.yml` → `grafana.environment: GF_SECURITY_ADMIN_USER=admin GF_SECURITY_ADMIN_PASSWORD=tu_pass_seguro` | Rebuild `docker compose up -d grafana` recrea con nuevo pass. Persistido en `grafana_data` volume; si ya cambiaste via UI, el env no sobreescribe (prioriza DB). |
+| **UI** | `http://localhost:3000` → avatar → **Change password** | Solo runtime, se pierde si `down -v`. |
+| **Reset si olvidaste** | `docker exec -it yadinstore-grafana grafana-cli admin reset-admin-password nuevoPass` → `docker restart yadinstore-grafana` | Sin perder dashboards. |
+| **Via API** | `curl -X PUT http://admin:oldpass@localhost:3000/api/admin/users/1/password -d '{"password":"nuevo"}' -H "Content-Type: application/json"` | Scripting. |
+
+> Si cambiaste pass via UI y luego `docker compose down -v` borra volumen, vuelve a `admin/admin` salvo que uses `GF_SECURITY_ADMIN_PASSWORD`. Para porcelain, commitear `GF_SECURITY_ADMIN_PASSWORD` solo si es dummy local; en prod usar secret.
+
 ## Conceptos clave
 
 | Concepto | Descripción |
