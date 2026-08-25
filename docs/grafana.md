@@ -94,6 +94,40 @@ User reporta: cambió admin password en Grafana y pregunta cómo configurarlo pe
 
 > Si cambiaste pass via UI y luego `docker compose down -v` borra volumen, vuelve a `admin/admin` salvo que uses `GF_SECURITY_ADMIN_PASSWORD`. Para porcelain, commitear `GF_SECURITY_ADMIN_PASSWORD` solo si es dummy local; en prod usar secret.
 
+## Verificación API 25-08-2026 — datasource Prometheus + dashboard RED 7 panels importados
+
+> Verificado `2026-08-25T05:40Z`: Grafana `10.4.3` `database: ok`, datasource `Prometheus` `uid: DS_PROMETHEUS` `http://host.docker.internal:9090` `isDefault: true`, dashboard `yadinstore-observability-live` 7 panels `GET /api/dashboards/uid/yadinstore-observability-live → 200`. `yadinstore-cicd-demo` no trae `prometheus` service — es esperado, usar `host.docker.internal:9090` tras `docker compose -f ci-cd-infra/docker-compose.yml up -d prometheus` o `http://yadin-prometheus:9090` con `yadin-net`.
+
+**Datasource vía API (sin tocar compose, solo API calls):**
+
+```powershell
+# Reset admin si password cambiado
+docker exec yadinstore-grafana grafana-cli admin reset-admin-password admin
+
+# Crear Prometheus datasource host.docker.internal:9090 (isDefault true, uid DS_PROMETHEUS para que dashboard resuelva ${DS_PROMETHEUS})
+curl.exe -s -u admin:admin -X POST http://localhost:3000/api/datasources -H "Content-Type: application/json" -d '{\"name\":\"Prometheus\",\"type\":\"prometheus\",\"uid\":\"DS_PROMETHEUS\",\"url\":\"http://host.docker.internal:9090\",\"access\":\"proxy\",\"isDefault\":true,\"editable\":true,\"jsonData\":{\"httpMethod\":\"POST\",\"timeInterval\":\"5s\",\"queryTimeout\":\"60s\"}}'
+# → {\"datasource\":{\"id\":1,\"uid\":\"DS_PROMETHEUS\",\"name\":\"Prometheus\",\"url\":\"http://host.docker.internal:9090\",\"isDefault\":true},\"message\":\"Datasource added\"}
+curl.exe -s -u admin:admin http://localhost:3000/api/datasources
+# → [{\"id\":1,\"uid\":\"DS_PROMETHEUS\",\"name\":\"Prometheus\",\"type\":\"prometheus\",\"url\":\"http://host.docker.internal:9090\",\"isDefault\":true}]
+```
+
+**Dashboard RED import vía API:**
+
+```powershell
+$json = Get-Content -Raw \"C:\GITHUB\YadinStore\ci-cd-infra\monitoring\grafana\dashboards\observability-live.json\" | ConvertFrom-Json
+$payload = @{ dashboard = $json; overwrite = $true; inputs = @(@{ name=\"DS_PROMETHEUS\"; type=\"datasource\"; pluginId=\"prometheus\"; value=\"DS_PROMETHEUS\" }) } | ConvertTo-Json -Depth 100
+Set-Content -Path $tmp -Value $payload
+curl.exe -s -u admin:admin -X POST http://localhost:3000/api/dashboards/db -H \"Content-Type: application/json\" --data-binary \"@$tmp\"
+# → {\"id\":1,\"uid\":\"yadinstore-observability-live\",\"url\":\"/d/yadinstore-observability-live/...\",\"status\":\"success\",\"version\":1}
+
+curl.exe -s -u admin:admin http://localhost:3000/api/dashboards/uid/yadinstore-observability-live | python -c \"import sys,json; d=json.load(sys.stdin); print(len(d['dashboard']['panels']))\"
+# → 7  (Rate, Errors 5xx, p95, Outbox Pending gauge, Published counter, Failed counter, Kafka Publish Errors)
+```
+
+URL: `http://localhost:3000/d/yadinstore-observability-live/yadinstore-e28094-observability-live-red` (refresh 5s, templating `DS_PROMETHEUS` → `Prometheus`).
+
+**Nota prometheus esperado:** `http://localhost:9090/-/healthy` y `http://host.docker.internal:9090/-/healthy` dan vacío / Bad Gateway si `ci-cd-infra` no está Up — normal en `yadinstore-cicd-demo` standalone. Levantar con `docker compose -f ci-cd-infra/docker-compose.yml up -d prometheus` y `docker network connect yadin-net yadinstore-grafana` si querés `Save & test` en verde; sin eso el datasource queda creado pero `Test` falla, dashboard igual importado (panels muestran No data hasta que prometheus scrapee `http_server_requests_seconds_count`).
+
 ## Conceptos clave
 
 | Concepto | Descripción |

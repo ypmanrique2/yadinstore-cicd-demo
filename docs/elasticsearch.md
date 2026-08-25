@@ -336,7 +336,7 @@ curl http://localhost:5601/api/status | jq .status.overall.level # → "availabl
    - Name: `yadinstore-logs-*` → Timestamp field: `@timestamp` → Save.
    - Si ya existe y quedaba cargando infinito (porque indice no existia al crearlo), **borrar y recrear** o `Refresh field list`.
 
-3. **Discover** → seleccionar `yadinstore-logs-*` → time picker `Last 15 minutes` o `Last 7 days` → deben aparecer 2 docs (ERROR + INFO). Filtros `level: ERROR` debe dar 1 hit.
+3. **Discover** → seleccionar `yadinstore-logs-*` → time picker **`Last 7 days`** (no `Last 15 minutes`) → deben aparecer 2 docs (ERROR + INFO). Filtros `level: ERROR` debe dar 1 hit. **Nota 25-08-2026:** docs tienen `@timestamp` `2026-08-23T12:00:00Z` / `12:05:00Z`; si hoy es `2026-08-25`, `Last 15 minutes` busca `now-15m` a `now` (2026-08-25) fuera de rango → `No results found` es esperado. Cambiar a `Last 7 days` o rango absoluto `2026-08-23` a `2026-08-25` para verlos. Verificado: `yadinstore-logs-2026.08.23 green 2 docs`, `Data View yadinstore-logs-* @timestamp Fields 13` (ver `GET /api/data_views` `54dd95c0-...`), `_search level:ERROR → 1 hit`.
 
 > Nota: `Stack Management → Data Views` reemplaza al viejo `Index Patterns` desde Kibana 8.x. Ambos nombres refieren al mismo objeto.
 
