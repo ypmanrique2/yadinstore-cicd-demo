@@ -1,0 +1,32 @@
+# ================================================================
+# render.yaml — Blueprint Render (free tier) para docker-live
+#
+# Servicio web que recibe la actividad Docker del agente local y
+# sirve el dashboard en vivo (patrón BE-KD). Sin build: solo
+# `node server.js` (zero dependencies).
+#
+# Deploy:
+#   1. Push de este repo a GitHub.
+#   2. Render > New > Blueprint > elegir el repo (yadinstore-cicd-demo).
+#   3. Opcional: setear DOCKER_LIVE_TOKEN en el servicio (y pasarlo
+#      como -Token al agente) para proteger los POST.
+# ================================================================
+
+# PAUSADO 2026-08-28 — Render free tier 750h cuota 13% $0 1h laboral (11→4 services, BE+BE-JD 99h).
+# Este 3º servicio es demo duplicado de yadinstore-jenkins-obs-live — mantener pausado ahorra 60h/mes.
+# Acción Dashboard: Render → yadinstore-cicd-demo-live → Suspend/Delete (ya pausado services: []).
+# Mantener activos: yadinstore-backend + yadinstore-frontend + yadinstore-admin + yadinstore-jenkins-obs-live (BE-JD activo 1h).
+# Ver yadinStore-Spec/avance_28-08-2026-render-1h.md (y 30m previo). Descomenta para reactivar.
+# services:
+#   - type: web
+#     name: yadinstore-cicd-demo-live
+#     runtime: node
+#     plan: free
+#     rootDir: docker-live
+#     buildCommand: ""          # zero dependencies — no build
+#     startCommand: node server.js
+#     healthCheckPath: /api/docker/live
+#     envVars:
+#       - key: DOCKER_LIVE_TOKEN
+#         sync: false           # opcional: token para los POST del agente
+services: []  # vacío = Blueprint no crea servicios (pausado). Para reactivar, descomenta bloque arriba y borra esta línea.
